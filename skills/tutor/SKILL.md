@@ -210,17 +210,17 @@ Present 4 questions with 4 options each:
 #### FR-3a — Node Weights
 
 1. Look for `fr-graph/node-weights.md` in the vault.
-2. **If found**: use existing W(n) values.
-3. **If not found**: compute initial weights:
-   - Count `[[NodeName]]` occurrences for each node → in-degree
+2. **If found**: verify accuracy by running:
+   ```bash
+   python3 skills/tutor/scripts/weight_calc.py recalc <vault>/fr-graph/node-weights.md
+   ```
+3. **If not found**: seed the initial file:
+   - Count `[[NodeName]]` wiki-link occurrences per node → in-degree
    - Normalize: `C(n) = in_degree(n) / max_in_degree`
-   - `M(n) = 0.5` for unmeasured nodes
-   - For MCQ-tested nodes: `M(n) = 0.4 * MCQ_correct/MCQ_attempts + 0.6 * 0.5`
-   - `R(n) = 0` for untested; for tested: `R(n) = 1 - exp(-days_since_last_tested / 14)`
-   - `P(n) = 0` (no prerequisite gap tracking yet)
-   - `W(n) = 0.25*C(n) + 0.35*(1-M(n)) + 0.20*P(n) + 0.20*R(n)`
-   - Write `fr-graph/node-weights.md`.
-4. Sort nodes by W(n) descending → top-3 are candidates.
+   - Set defaults: `M(n) = 0.50`, `P(n) = 0.00`, `R(n) = 0.00`
+   - Write the markdown table to `fr-graph/node-weights.md` (see existing vaults for format)
+   - Run `weight_calc.py recalc` to compute all W(n) values deterministically
+4. Run `python3 skills/tutor/scripts/weight_calc.py next <weights_file>` to get top priority nodes.
 
 #### FR-3b — Nuance Gaps
 
@@ -286,12 +286,8 @@ Apply the three evaluation perspectives sequentially:
 
 **Evaluator 3 — Misconception Detector**: Check for sign reversals, conflations, hallucinations, repeated prior errors.
 
-**Synthesis**: Combine all three:
-```
-overall_score = 0.45 * coverage_score + 0.40 * depth_score + 0.15 * (1 - misconception_penalty)
-```
-
-Grades: 🌟 Excellent (≥0.85) · 🟢 Good (0.70–0.84) · 🟡 Developing (0.50–0.69) · 🔴 Needs Work (<0.50)
+**Synthesis**: Combine scores per `evaluator-prompts.md` formula → overall grade.
+Grades: 🌟 ≥0.85 · 🟢 0.70–0.84 · 🟡 0.50–0.69 · 🔴 <0.50
 
 ### FR-6.5: Post-Teaching Micro-Assessment Loop
 
@@ -314,25 +310,17 @@ For each gap identified in the evaluation:
 1. Generate 1-2 micro-questions scoped to the segment just taught
 2. Build a micro scope contract (1-2 claims only)
 3. Run the **same evaluator pipeline** as full FR (Coverage + Depth + Misconception → Synthesis)
-4. Score with same formula: `0.45 * coverage + 0.40 * depth + 0.15 * (1 - misconception_penalty)`
-5. Apply as fractional W(n) update: `micro_delta = full_delta(score) * MICRO_WEIGHT_MULTIPLIER`
-6. Default **MICRO_WEIGHT_MULTIPLIER = 0.3** (tunable per vault in node-weights.md header)
-7. If score < 0.50 → re-teach with different framing, offer re-quiz (max 2 attempts)
-8. If score >= 0.50 → proceed to next gap segment
+4. Update weights via script with `--micro` flag:
+   ```bash
+   python3 skills/tutor/scripts/weight_calc.py update <weights_file> <node> \
+     --coverage <cov> --depth <dep> --misconception <mis> --micro
+   ```
+5. If score < 0.50 → re-teach with different framing, offer re-quiz (max 2 attempts)
+6. If score >= 0.50 → proceed to next gap segment
 
-#### Why not binary pass/fail:
-
-Micro-quizzes use the same graded evaluator pipeline because a flat bonus discards signal.
-A 0.90 micro-score reflects stronger comprehension than 0.55 — the weight update should
-reflect that proportionally.
-
-#### Session-end adjusted weight:
-
-```
-final_W(n) = initial_W(n) + full_FR_delta + sum(micro_deltas)
-```
-
-Written to `fr-graph/node-weights.md` in FR-8.
+Micro-quizzes use the same graded pipeline (not binary pass/fail) because a 0.90 score
+reflects stronger comprehension than 0.55 — the `--micro` flag applies a 0.3× multiplier
+to the weight update automatically.
 
 ### FR-7: Present Results
 
@@ -364,15 +352,18 @@ Written to `fr-graph/node-weights.md` in FR-8.
 
 Append new gaps, update status of existing gaps.
 
-#### FR-8c — Recompute Node Weights
+#### FR-8c — Update Node Weights
 
-```
-M(n) = 0.4 * MCQ_rate + 0.6 * FR_depth_avg
-R(n) = 0 (just tested)
-W(n) = 0.25*C(n) + 0.35*(1-M(n)) + 0.20*P(n) + 0.20*R(n)
+Run the weight calculator script with the evaluator scores from FR-6c:
+
+```bash
+python3 skills/tutor/scripts/weight_calc.py update <weights_file> <node> \
+  --coverage <cov> --depth <dep> --misconception <mis> --decay
 ```
 
-Rewrite `fr-graph/node-weights.md`.
+The `--decay` flag also adjusts recency for all other nodes. **Do not compute
+weights manually** — the script handles EMA mastery updates, recency decay,
+and atomic file writes to prevent data loss during session handoffs.
 
 ---
 
