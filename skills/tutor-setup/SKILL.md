@@ -1,10 +1,12 @@
 ---
 name: tutor-setup
 description: >
-  Transforms knowledge sources into an Obsidian StudyVault. Two modes:
-  (1) Document Mode — PDF/text/web sources → study notes with practice questions.
-  (2) Codebase Mode — source code project → onboarding vault for new developers.
-  Mode is auto-detected based on project markers.
+  Build a StudyVault from any knowledge source — PDFs, docs, web pages,
+  or codebases. Extracts concepts, generates practice questions, and seeds
+  the node-weight graph for adaptive learning. Supports incremental ingestion
+  into existing vaults with source attribution and contradiction flagging.
+  Use when: setting up a new study vault, ingesting a PDF, adding a source,
+  building from a codebase, or creating study materials from documents.
 argument-hint: "[source-path-or-url]"
 ---
 

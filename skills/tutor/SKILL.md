@@ -1,11 +1,12 @@
 ---
 name: tutor
 description: >
-  Unified adaptive tutor for Obsidian StudyVault learning. Handles vault setup,
-  then routes to MCQ (multiple choice) or free-response mode. Use when the user
-  wants to: (1) study from a PDF or existing vault, (2) take a quiz, (3) practice
-  free-response answers, (4) check their progress.
-  Trigger phrases: "quiz me", "test me", "let's study", "tutor", "study session".
+  Adaptive learning engine for any knowledge source. Builds and drills from
+  Obsidian-compatible StudyVaults using MCQ quizzes, free-response with
+  multi-evaluator grading, micro-assessments, and spaced repetition via
+  node-weight graphs. Supports multi-source vaults with scoped grading.
+  Use when: studying, quizzing, reviewing, learning from a PDF, testing
+  knowledge, checking mastery, practicing recall, or building a study vault.
 argument-hint: "[optional: pdf-path or source-path]"
 ---
 
