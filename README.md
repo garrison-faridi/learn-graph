@@ -116,7 +116,7 @@ This follows the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf5559
 ## Installation
 
 ```bash
-git clone https://github.com/gfaridi/learn-graph.git
+git clone https://github.com/garrison-faridi/learn-graph.git
 cd learn-graph
 bash install.sh
 ```
@@ -217,6 +217,7 @@ Supports both **Document Mode** (PDFs, text, web content) and **Codebase Mode** 
                        files + claim ledger
                        + vault gaps
                        + recompute weights
+                       (via weight_calc.py)
 ```
 
 ---
@@ -242,6 +243,9 @@ StudyVault/
     ├── node-weights.md                ← W(n) scores for all concept nodes
     ├── nuance-gaps.md                 ← running log of identified FR gaps
     └── vault-gaps.md                  ← untested depth per node (scope contract)
+
+scripts/
+└── weight_calc.py                     ← deterministic W(n) calculator (Python CLI)
 ```
 
 **Concept note ↔ tracker pairing:**
@@ -284,7 +288,7 @@ W(n) = 0.25 * C(n)        ← centrality: how many notes link to this concept
      + 0.20 * R(n)         ← recency: time since last tested (decays over 14 days)
 ```
 
-Nodes with high centrality and low mastery surface first. After each FR session, weights are recomputed and saved to `fr-graph/node-weights.md`.
+Nodes with high centrality and low mastery surface first. After each FR session, the `weight_calc.py` script recomputes weights deterministically and writes them to `fr-graph/node-weights.md`. No LLM arithmetic — the agent passes evaluation scores to the script, which handles all math and file I/O.
 
 ### FR Evaluation Pipeline
 
@@ -355,6 +359,7 @@ Built on top of [**RoundTable02/tutor-skills**](https://github.com/RoundTable02/
 - **Micro-assessment loop** — post-teaching comprehension checkpoints with the same graded evaluator pipeline (not binary pass/fail), fractional weight updates via configurable multiplier
 - **Claim ledger persistence** — per-node tracker files with claim-level pass/fail history, persistent gap checklists, and misconception logs. Fully agent-agnostic (pure markdown, no DB dependency)
 - **Multi-source incremental ingestion** — add new sources to existing vaults without rebuilding. Contradiction flagging, source attribution, and scoped grading keep assessment isolated per source while knowledge compounds across them
+- **Deterministic weight calculator** — Python script (`scripts/weight_calc.py`) replaces LLM arithmetic for all W(n) updates. Commands: `update`, `score`, `recalc`, `next`, `show`. Supports full FR and micro-assessment updates with atomic file writes (prevents data loss during session handoffs)
 - **Inline vault setup** — pass a PDF path directly, no separate `/tutor-setup` step needed
 - Domain-agnostic evaluator prompts (extracted from vault at runtime)
 - Fixed hardcoded `pdftotext` path to use runtime detection
