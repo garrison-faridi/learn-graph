@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyVault Session Trace</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #07080c;
+  color: #e0e0e0;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+canvas { position: absolute; top: 0; left: 0; }
+
+#status-pill {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10,12,20,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px;
+  padding: 10px 24px;
+  font-size: 13px;
+  color: #fff;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  z-index: 20;
+  transition: all 0.4s ease;
+  max-width: 600px;
+}
+
+#status-pill .phase {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 2px;
+}
+
+#status-pill .action {
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.4;
+}
+
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 20;
+}
+
+.ctrl-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #aaa;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.ctrl-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.ctrl-btn.active { background: rgba(99,184,255,0.15); border-color: rgba(99,184,255,0.4); color: #63b8ff; }
+
+#progress-ring {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  z-index: 20;
+}
+
+#step-dots {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 20;
+}
+
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.step-dot.visited { background: rgba(255,255,255,0.3); }
+.step-dot.current { background: #63b8ff; transform: scale(1.5); }
+
+#title {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  z-index: 20;
+  font-size: 11px;
+  color: #444;
+  letter-spacing: 0.5px;
+}
+
+#vault-label {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 20;
+  font-size: 11px;
+  color: #444;
+  text-align: right;
+}
+
+#node-tooltip {
+  position: absolute;
+  display: none;
+  background: rgba(12,14,22,0.92);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 11px;
+  max-width: 250px;
+  z-index: 30;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+#node-tooltip .tt-name { color: #fff; font-weight: 600; font-size: 12px; }
+#node-tooltip .tt-unit { color: #888; margin-top: 2px; }
+#node-tooltip .tt-state { margin-top: 4px; color: #63b8ff; }
+
+#speed-indicator {
+  position: absolute;
+  bottom: 28px;
+  left: 24px;
+  z-index: 20;
+  font-size: 10px;
+  color: #444;
+}
+</style>
+</head>
+<body>
+<canvas id="graph"></canvas>
+
+<div id="title">STUDYVAULT SESSION TRACE</div>
+<div id="vault-label">Biology 2e · 47 nodes · 148 edges<br>FR Session: Ch15 Genes & Proteins</div>
+
+<div id="status-pill">
+  <div class="phase">ready</div>
+  <div class="action">Press play to watch the session unfold across the graph</div>
+</div>
+
+<div id="step-dots"></div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="btn-prev" title="Previous step">◂</button>
+  <button class="ctrl-btn" id="btn-play" title="Play / Pause (Space)">▶</button>
+  <button class="ctrl-btn" id="btn-next" title="Next step">▸</button>
+  <button class="ctrl-btn" id="btn-reset" title="Reset (R)">↺</button>
+</div>
+
+<div id="speed-indicator">1×</div>
+
+<div id="node-tooltip">
+  <div class="tt-name"></div>
+  <div class="tt-unit"></div>
+  <div class="tt-state"></div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+
+const graphData = {"nodes":[{"id":"Ch01-The-Study-of-Life","unit":"01-Chemistry-of-Life","label":"The Study of Life","ch":1},{"id":"Ch02-The-Chemical-Foundation-of-Life","unit":"01-Chemistry-of-Life","label":"Chemical Foundation","ch":2},{"id":"Ch03-Biological-Macromolecules","unit":"01-Chemistry-of-Life","label":"Macromolecules","ch":3},{"id":"Ch04-Cell-Structure","unit":"02-The-Cell","label":"Cell Structure","ch":4},{"id":"Ch05-Structure-and-Function-of-Plasma","unit":"02-The-Cell","label":"Plasma Membranes","ch":5},{"id":"Ch06-Metabolism","unit":"02-The-Cell","label":"Metabolism","ch":6},{"id":"Ch07-Cellular-Respiration","unit":"02-The-Cell","label":"Cell Respiration","ch":7},{"id":"Ch08-Photosynthesis","unit":"02-The-Cell","label":"Photosynthesis","ch":8},{"id":"Ch09-Cell-Communication","unit":"02-The-Cell","label":"Cell Communication","ch":9},{"id":"Ch10-Cell-Reproduction","unit":"02-The-Cell","label":"Cell Reproduction","ch":10},{"id":"Ch11-Meiosis-and-Sexual-Reproduction","unit":"03-Genetics","label":"Meiosis","ch":11},{"id":"Ch12-Mendel-s-Experiments-and-Heredity","unit":"03-Genetics","label":"Mendel's Laws","ch":12},{"id":"Ch13-Modern-Understandings-of-Inheritance","unit":"03-Genetics","label":"Modern Inheritance","ch":13},{"id":"Ch14-DNA-Structure-and-Function","unit":"03-Genetics","label":"DNA Structure","ch":14},{"id":"Ch15-Genes-and-Proteins","unit":"03-Genetics","label":"Genes & Proteins","ch":15},{"id":"Ch16-Gene-Expression","unit":"03-Genetics","label":"Gene Expression","ch":16},{"id":"Ch17-Biotechnology-and-Genomics","unit":"03-Genetics","label":"Biotech & Genomics","ch":17},{"id":"Ch18-Evolution-and-the-Origin-of-Species","unit":"04-Evolution","label":"Origin of Species","ch":18},{"id":"Ch19-The-Evolution-of-Populations","unit":"04-Evolution","label":"Population Evolution","ch":19},{"id":"Ch20-Phylogenies-and-the-History-of-Life","unit":"04-Evolution","label":"Phylogenies","ch":20},{"id":"Ch21-Viruses","unit":"05-Biological-Diversity","label":"Viruses","ch":21},{"id":"Ch22-Prokaryotes-Bacteria-and-Archaea","unit":"05-Biological-Diversity","label":"Prokaryotes","ch":22},{"id":"Ch23-Protists","unit":"05-Biological-Diversity","label":"Protists","ch":23},{"id":"Ch24-Fungi","unit":"05-Biological-Diversity","label":"Fungi","ch":24},{"id":"Ch25-Seedless-Plants","unit":"05-Biological-Diversity","label":"Seedless Plants","ch":25},{"id":"Ch26-Seed-Plants","unit":"05-Biological-Diversity","label":"Seed Plants","ch":26},{"id":"Ch27-Introduction-to-Animal-Diversity","unit":"05-Biological-Diversity","label":"Animal Diversity","ch":27},{"id":"Ch28-Invertebrates","unit":"05-Biological-Diversity","label":"Invertebrates","ch":28},{"id":"Ch29-Vertebrates","unit":"05-Biological-Diversity","label":"Vertebrates","ch":29},{"id":"Ch30-Plant-Form-and-Physiology","unit":"06-Plant-Biology","label":"Plant Physiology","ch":30},{"id":"Ch31-Soil-and-Plant-Nutrition","unit":"06-Plant-Biology","label":"Plant Nutrition","ch":31},{"id":"Ch32-Plant-Reproduction","unit":"06-Plant-Biology","label":"Plant Reproduction","ch":32},{"id":"Ch33-The-Animal-Body-Basic-Form-and","unit":"07-Animal-Systems","label":"Animal Body","ch":33},{"id":"Ch34-Animal-Nutrition-and-the-Digestive","unit":"07-Animal-Systems","label":"Digestion","ch":34},{"id":"Ch35-The-Nervous-System","unit":"07-Animal-Systems","label":"Nervous System","ch":35},{"id":"Ch36-Sensory-Systems","unit":"07-Animal-Systems","label":"Sensory Systems","ch":36},{"id":"Ch37-The-Endocrine-System","unit":"07-Animal-Systems","label":"Endocrine","ch":37},{"id":"Ch38-The-Musculoskeletal-System","unit":"07-Animal-Systems","label":"Musculoskeletal","ch":38},{"id":"Ch39-The-Respiratory-System","unit":"07-Animal-Systems","label":"Respiratory","ch":39},{"id":"Ch40-The-Circulatory-System","unit":"07-Animal-Systems","label":"Circulatory","ch":40},{"id":"Ch41-Osmotic-Regulation-and-Excretion","unit":"07-Animal-Systems","label":"Osmoregulation","ch":41},{"id":"Ch42-The-Immune-System","unit":"07-Animal-Systems","label":"Immune System","ch":42},{"id":"Ch43-Animal-Reproduction-and-Development","unit":"07-Animal-Systems","label":"Reproduction","ch":43},{"id":"Ch44-Ecology-and-the-Biosphere","unit":"08-Ecology","label":"Ecology","ch":44},{"id":"Ch45-Population-and-Community-Ecology","unit":"08-Ecology","label":"Pop. Ecology","ch":45},{"id":"Ch46-Ecosystems","unit":"08-Ecology","label":"Ecosystems","ch":46},{"id":"Ch47-Conservation-Biology-and-Biodiversity","unit":"08-Ecology","label":"Conservation","ch":47}],"edges":[{"source":"Ch18-Evolution-and-the-Origin-of-Species","target":"Ch19-The-Evolution-of-Populations"},{"source":"Ch18-Evolution-and-the-Origin-of-Species","target":"Ch20-Phylogenies-and-the-History-of-Life"},{"source":"Ch19-The-Evolution-of-Populations","target":"Ch20-Phylogenies-and-the-History-of-Life"},{"source":"Ch04-Cell-Structure","target":"Ch05-Structure-and-Function-of-Plasma"},{"source":"Ch04-Cell-Structure","target":"Ch06-Metabolism"},{"source":"Ch04-Cell-Structure","target":"Ch07-Cellular-Respiration"},{"source":"Ch04-Cell-Structure","target":"Ch08-Photosynthesis"},{"source":"Ch04-Cell-Structure","target":"Ch09-Cell-Communication"},{"source":"Ch04-Cell-Structure","target":"Ch10-Cell-Reproduction"},{"source":"Ch09-Cell-Communication","target":"Ch05-Structure-and-Function-of-Plasma"},{"source":"Ch09-Cell-Communication","target":"Ch06-Metabolism"},{"source":"Ch09-Cell-Communication","target":"Ch07-Cellular-Respiration"},{"source":"Ch09-Cell-Communication","target":"Ch08-Photosynthesis"},{"source":"Ch09-Cell-Communication","target":"Ch10-Cell-Reproduction"},{"source":"Ch06-Metabolism","target":"Ch05-Structure-and-Function-of-Plasma"},{"source":"Ch06-Metabolism","target":"Ch07-Cellular-Respiration"},{"source":"Ch06-Metabolism","target":"Ch08-Photosynthesis"},{"source":"Ch06-Metabolism","target":"Ch10-Cell-Reproduction"},{"source":"Ch10-Cell-Reproduction","target":"Ch05-Structure-and-Function-of-Plasma"},{"source":"Ch10-Cell-Reproduction","target":"Ch07-Cellular-Respiration"},{"source":"Ch10-Cell-Reproduction","target":"Ch08-Photosynthesis"},{"source":"Ch07-Cellular-Respiration","target":"Ch05-Structure-and-Function-of-Plasma"},{"source":"Ch07-Cellular-Respiration","target":"Ch08-Photosynthesis"},{"source":"Ch05-Structure-and-Function-of-Plasma","target":"Ch08-Photosynthesis"},{"source":"Ch11-Meiosis-and-Sexual-Reproduction","target":"Ch12-Mendel-s-Experiments-and-Heredity"},{"source":"Ch11-Meiosis-and-Sexual-Reproduction","target":"Ch13-Modern-Understandings-of-Inheritance"},{"source":"Ch11-Meiosis-and-Sexual-Reproduction","target":"Ch14-DNA-Structure-and-Function"},{"source":"Ch11-Meiosis-and-Sexual-Reproduction","target":"Ch15-Genes-and-Proteins"},{"source":"Ch11-Meiosis-and-Sexual-Reproduction","target":"Ch16-Gene-Expression"},{"source":"Ch11-Meiosis-and-Sexual-Reproduction","target":"Ch17-Biotechnology-and-Genomics"},{"source":"Ch12-Mendel-s-Experiments-and-Heredity","target":"Ch13-Modern-Understandings-of-Inheritance"},{"source":"Ch12-Mendel-s-Experiments-and-Heredity","target":"Ch14-DNA-Structure-and-Function"},{"source":"Ch12-Mendel-s-Experiments-and-Heredity","target":"Ch15-Genes-and-Proteins"},{"source":"Ch12-Mendel-s-Experiments-and-Heredity","target":"Ch16-Gene-Expression"},{"source":"Ch12-Mendel-s-Experiments-and-Heredity","target":"Ch17-Biotechnology-and-Genomics"},{"source":"Ch13-Modern-Understandings-of-Inheritance","target":"Ch14-DNA-Structure-and-Function"},{"source":"Ch13-Modern-Understandings-of-Inheritance","target":"Ch15-Genes-and-Proteins"},{"source":"Ch13-Modern-Understandings-of-Inheritance","target":"Ch16-Gene-Expression"},{"source":"Ch13-Modern-Understandings-of-Inheritance","target":"Ch17-Biotechnology-and-Genomics"},{"source":"Ch14-DNA-Structure-and-Function","target":"Ch15-Genes-and-Proteins"},{"source":"Ch14-DNA-Structure-and-Function","target":"Ch16-Gene-Expression"},{"source":"Ch14-DNA-Structure-and-Function","target":"Ch17-Biotechnology-and-Genomics"},{"source":"Ch15-Genes-and-Proteins","target":"Ch16-Gene-Expression"},{"source":"Ch15-Genes-and-Proteins","target":"Ch17-Biotechnology-and-Genomics"},{"source":"Ch16-Gene-Expression","target":"Ch17-Biotechnology-and-Genomics"},{"source":"Ch01-The-Study-of-Life","target":"Ch02-The-Chemical-Foundation-of-Life"},{"source":"Ch01-The-Study-of-Life","target":"Ch03-Biological-Macromolecules"},{"source":"Ch02-The-Chemical-Foundation-of-Life","target":"Ch03-Biological-Macromolecules"},{"source":"Ch21-Viruses","target":"Ch22-Prokaryotes-Bacteria-and-Archaea"},{"source":"Ch21-Viruses","target":"Ch23-Protists"},{"source":"Ch21-Viruses","target":"Ch24-Fungi"},{"source":"Ch21-Viruses","target":"Ch25-Seedless-Plants"},{"source":"Ch21-Viruses","target":"Ch26-Seed-Plants"},{"source":"Ch21-Viruses","target":"Ch27-Introduction-to-Animal-Diversity"},{"source":"Ch21-Viruses","target":"Ch28-Invertebrates"},{"source":"Ch21-Viruses","target":"Ch29-Vertebrates"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch23-Protists"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch24-Fungi"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch25-Seedless-Plants"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch26-Seed-Plants"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch27-Introduction-to-Animal-Diversity"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch28-Invertebrates"},{"source":"Ch22-Prokaryotes-Bacteria-and-Archaea","target":"Ch29-Vertebrates"},{"source":"Ch23-Protists","target":"Ch24-Fungi"},{"source":"Ch23-Protists","target":"Ch25-Seedless-Plants"},{"source":"Ch23-Protists","target":"Ch26-Seed-Plants"},{"source":"Ch23-Protists","target":"Ch27-Introduction-to-Animal-Diversity"},{"source":"Ch23-Protists","target":"Ch28-Invertebrates"},{"source":"Ch23-Protists","target":"Ch29-Vertebrates"},{"source":"Ch24-Fungi","target":"Ch25-Seedless-Plants"},{"source":"Ch24-Fungi","target":"Ch26-Seed-Plants"},{"source":"Ch24-Fungi","target":"Ch27-Introduction-to-Animal-Diversity"},{"source":"Ch24-Fungi","target":"Ch28-Invertebrates"},{"source":"Ch24-Fungi","target":"Ch29-Vertebrates"},{"source":"Ch25-Seedless-Plants","target":"Ch26-Seed-Plants"},{"source":"Ch25-Seedless-Plants","target":"Ch27-Introduction-to-Animal-Diversity"},{"source":"Ch25-Seedless-Plants","target":"Ch28-Invertebrates"},{"source":"Ch25-Seedless-Plants","target":"Ch29-Vertebrates"},{"source":"Ch26-Seed-Plants","target":"Ch27-Introduction-to-Animal-Diversity"},{"source":"Ch26-Seed-Plants","target":"Ch28-Invertebrates"},{"source":"Ch26-Seed-Plants","target":"Ch29-Vertebrates"},{"source":"Ch27-Introduction-to-Animal-Diversity","target":"Ch28-Invertebrates"},{"source":"Ch27-Introduction-to-Animal-Diversity","target":"Ch29-Vertebrates"},{"source":"Ch28-Invertebrates","target":"Ch29-Vertebrates"},{"source":"Ch30-Plant-Form-and-Physiology","target":"Ch31-Soil-and-Plant-Nutrition"},{"source":"Ch30-Plant-Form-and-Physiology","target":"Ch32-Plant-Reproduction"},{"source":"Ch31-Soil-and-Plant-Nutrition","target":"Ch32-Plant-Reproduction"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch34-Animal-Nutrition-and-the-Digestive"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch35-The-Nervous-System"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch36-Sensory-Systems"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch37-The-Endocrine-System"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch38-The-Musculoskeletal-System"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch39-The-Respiratory-System"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch40-The-Circulatory-System"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch42-The-Immune-System"},{"source":"Ch33-The-Animal-Body-Basic-Form-and","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch35-The-Nervous-System"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch36-Sensory-Systems"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch37-The-Endocrine-System"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch38-The-Musculoskeletal-System"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch39-The-Respiratory-System"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch40-The-Circulatory-System"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch42-The-Immune-System"},{"source":"Ch34-Animal-Nutrition-and-the-Digestive","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch35-The-Nervous-System","target":"Ch36-Sensory-Systems"},{"source":"Ch35-The-Nervous-System","target":"Ch37-The-Endocrine-System"},{"source":"Ch35-The-Nervous-System","target":"Ch38-The-Musculoskeletal-System"},{"source":"Ch35-The-Nervous-System","target":"Ch39-The-Respiratory-System"},{"source":"Ch35-The-Nervous-System","target":"Ch40-The-Circulatory-System"},{"source":"Ch35-The-Nervous-System","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch35-The-Nervous-System","target":"Ch42-The-Immune-System"},{"source":"Ch35-The-Nervous-System","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch36-Sensory-Systems","target":"Ch37-The-Endocrine-System"},{"source":"Ch36-Sensory-Systems","target":"Ch38-The-Musculoskeletal-System"},{"source":"Ch36-Sensory-Systems","target":"Ch39-The-Respiratory-System"},{"source":"Ch36-Sensory-Systems","target":"Ch40-The-Circulatory-System"},{"source":"Ch36-Sensory-Systems","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch36-Sensory-Systems","target":"Ch42-The-Immune-System"},{"source":"Ch36-Sensory-Systems","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch37-The-Endocrine-System","target":"Ch38-The-Musculoskeletal-System"},{"source":"Ch37-The-Endocrine-System","target":"Ch39-The-Respiratory-System"},{"source":"Ch37-The-Endocrine-System","target":"Ch40-The-Circulatory-System"},{"source":"Ch37-The-Endocrine-System","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch37-The-Endocrine-System","target":"Ch42-The-Immune-System"},{"source":"Ch37-The-Endocrine-System","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch38-The-Musculoskeletal-System","target":"Ch39-The-Respiratory-System"},{"source":"Ch38-The-Musculoskeletal-System","target":"Ch40-The-Circulatory-System"},{"source":"Ch38-The-Musculoskeletal-System","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch38-The-Musculoskeletal-System","target":"Ch42-The-Immune-System"},{"source":"Ch38-The-Musculoskeletal-System","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch39-The-Respiratory-System","target":"Ch40-The-Circulatory-System"},{"source":"Ch39-The-Respiratory-System","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch39-The-Respiratory-System","target":"Ch42-The-Immune-System"},{"source":"Ch39-The-Respiratory-System","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch40-The-Circulatory-System","target":"Ch41-Osmotic-Regulation-and-Excretion"},{"source":"Ch40-The-Circulatory-System","target":"Ch42-The-Immune-System"},{"source":"Ch40-The-Circulatory-System","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch41-Osmotic-Regulation-and-Excretion","target":"Ch42-The-Immune-System"},{"source":"Ch41-Osmotic-Regulation-and-Excretion","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch42-The-Immune-System","target":"Ch43-Animal-Reproduction-and-Development"},{"source":"Ch44-Ecology-and-the-Biosphere","target":"Ch45-Population-and-Community-Ecology"},{"source":"Ch44-Ecology-and-the-Biosphere","target":"Ch46-Ecosystems"},{"source":"Ch44-Ecology-and-the-Biosphere","target":"Ch47-Conservation-Biology-and-Biodiversity"},{"source":"Ch45-Population-and-Community-Ecology","target":"Ch46-Ecosystems"},{"source":"Ch45-Population-and-Community-Ecology","target":"Ch47-Conservation-Biology-and-Biodiversity"},{"source":"Ch46-Ecosystems","target":"Ch47-Conservation-Biology-and-Biodiversity"}]};
+
+// Session events — cumulative highlights
+const events = [
+  { t: 0, phase: "PHASE 1 · LOAD WEIGHTS", text: "Reading node-weights.md — scanning all 47 nodes", light: [], edges: [], glow: [], color: null },
+  { t: 1, phase: "PHASE 1 · SCAN GENETICS", text: "7 genetics nodes tied at W = 0.325 — all unmeasured",
+    light: ["Ch11-Meiosis-and-Sexual-Reproduction","Ch12-Mendel-s-Experiments-and-Heredity","Ch13-Modern-Understandings-of-Inheritance","Ch14-DNA-Structure-and-Function","Ch15-Genes-and-Proteins","Ch16-Gene-Expression","Ch17-Biotechnology-and-Genomics"],
+    edges: [], glow: [], color: "#63b8ff" },
+  { t: 2, phase: "PHASE 2 · SELECT TARGET", text: "Student selects Ch15: Genes & Proteins → Central Dogma",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#f59e0b" },
+  { t: 3, phase: "PHASE 2 · READ CONCEPT NOTE", text: "Reading Ch15-Genes-and-Proteins.md — genetic code, transcription, translation",
+    light: ["Ch15-Genes-and-Proteins"], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#63b8ff" },
+  { t: 4, phase: "PHASE 2 · TRAVERSE NEIGHBORS", text: "Following wiki-links → Ch14 (DNA Structure) and Ch16 (Gene Expression)",
+    light: ["Ch14-DNA-Structure-and-Function","Ch16-Gene-Expression"], 
+    edges: [["Ch15-Genes-and-Proteins","Ch14-DNA-Structure-and-Function"],["Ch15-Genes-and-Proteins","Ch16-Gene-Expression"]],
+    glow: ["Ch15-Genes-and-Proteins"], color: "#a78bfa" },
+  { t: 5, phase: "PHASE 3 · SCOPE CONTRACT", text: "3 scoped claims generated · 8 vault gaps saved for later",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#a78bfa" },
+  { t: 6, phase: "PHASE 3 · QUESTION PRESENTED", text: "\"Explain how genetic information flows from DNA to protein…\"",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#f59e0b" },
+  { t: 7, phase: "PHASE 4 · STUDENT ANSWERS", text: "Student describes flow, names codons, plants deliberate enzyme error",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#22c55e" },
+  { t: 8, phase: "PHASE 5 · EVAL: COVERAGE", text: "Scoped claims — flow ✓ · codons ✓ · degeneracy ✗ → coverage = 0.67",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#f59e0b" },
+  { t: 9, phase: "PHASE 5 · EVAL: DEPTH", text: "Mechanistic depth: 0.2 — named steps but no mechanism → depth = 0.12",
+    light: ["Ch14-DNA-Structure-and-Function","Ch16-Gene-Expression"], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#f59e0b" },
+  { t: 10, phase: "PHASE 5 · EVAL: MISCONCEPTIONS", text: "🚨 'DNA polymerase' → should be RNA polymerase — CRITICAL · penalty = 0.30",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#ef4444" },
+  { t: 11, phase: "PHASE 6 · SYNTHESIS", text: "0.45(0.67) + 0.40(0.12) + 0.15(0.70) = 0.37 → 🔴 Needs Work",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#ef4444" },
+  { t: 12, phase: "PHASE 7 · UPDATE WEIGHTS", text: "Ch15 mastery drops: M = 0.50 → 0.22 · W = 0.325 → 0.422 ↑ priority",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#ef4444", weight: { id: "Ch15-Genes-and-Proteins", val: "W 0.422 ↑" } },
+  { t: 13, phase: "PHASE 7 · RIPPLE", text: "Neighbor prerequisite gaps shift — weakness propagates through genetics cluster",
+    light: ["Ch11-Meiosis-and-Sexual-Reproduction","Ch12-Mendel-s-Experiments-and-Heredity","Ch13-Modern-Understandings-of-Inheritance","Ch17-Biotechnology-and-Genomics"],
+    edges: [["Ch15-Genes-and-Proteins","Ch11-Meiosis-and-Sexual-Reproduction"],["Ch15-Genes-and-Proteins","Ch12-Mendel-s-Experiments-and-Heredity"],["Ch15-Genes-and-Proteins","Ch13-Modern-Understandings-of-Inheritance"],["Ch15-Genes-and-Proteins","Ch14-DNA-Structure-and-Function"],["Ch15-Genes-and-Proteins","Ch16-Gene-Expression"],["Ch15-Genes-and-Proteins","Ch17-Biotechnology-and-Genomics"]],
+    glow: ["Ch15-Genes-and-Proteins"], color: "#a78bfa" },
+  { t: 14, phase: "PHASE 7 · SAVE GAPS", text: "8 vault gaps persisted for Ch15 — untested depth queued for future sessions",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins"], color: "#63b8ff" },
+  { t: 15, phase: "SESSION COMPLETE", text: "Ch15 → 🔴 0.37 · Weight ↑ 0.422 · 8 gaps queued · Neighbors shifted",
+    light: [], edges: [], glow: ["Ch15-Genes-and-Proteins","Ch14-DNA-Structure-and-Function","Ch16-Gene-Expression"], color: "#22c55e" },
+];
+
+// ============================================================
+// COLORS
+// ============================================================
+
+const unitColors = {
+  "01-Chemistry-of-Life":     "#3b82f6",
+  "02-The-Cell":              "#22c55e",
+  "03-Genetics":              "#a78bfa",
+  "04-Evolution":             "#f59e0b",
+  "05-Biological-Diversity":  "#ec4899",
+  "06-Plant-Biology":         "#14b8a6",
+  "07-Animal-Systems":        "#ef4444",
+  "08-Ecology":               "#06b6d4",
+};
+
+// ============================================================
+// CANVAS
+// ============================================================
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+let W, H;
+const dpr = window.devicePixelRatio || 1;
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ============================================================
+// LAYOUT
+// ============================================================
+
+const nodeMap = {};
+graphData.nodes.forEach(n => {
+  n.x = W/2 + (Math.random() - 0.5) * W * 0.5;
+  n.y = H/2 + (Math.random() - 0.5) * H * 0.4;
+  n.vx = 0; n.vy = 0;
+  n.lit = 0;        // 0 = dark, 1 = fully lit — accumulates
+  n.glowPulse = 0;  // active glow pulse (current step)
+  n.activeColor = null;
+  n.weightText = '';
+  nodeMap[n.id] = n;
+});
+
+const edgeObjs = graphData.edges.map(e => ({
+  source: nodeMap[e.source], target: nodeMap[e.target],
+  lit: 0, pulse: 0
+}));
+
+// Unit cluster targets
+const unitList = [...new Set(graphData.nodes.map(n => n.unit))].sort();
+const uc = {};
+const aStep = (Math.PI * 2) / unitList.length;
+unitList.forEach((u, i) => {
+  const a = i * aStep - Math.PI/2;
+  uc[u] = { x: W/2 + Math.cos(a) * Math.min(W,H) * 0.22, y: H/2 + Math.sin(a) * Math.min(W,H) * 0.2 };
+});
+
+function simulate() {
+  const nodes = graphData.nodes;
+  const pad = 120; // soft padding from edges — no hard clamp
+
+  nodes.forEach(n => {
+    // Gentle center pull
+    n.vx += (W/2 - n.x) * 0.001;
+    n.vy += (H/2 - n.y) * 0.001;
+
+    // Unit clustering — pull toward cluster center
+    const c = uc[n.unit];
+    if (c) { n.vx += (c.x - n.x) * 0.008; n.vy += (c.y - n.y) * 0.008; }
+
+    // Soft boundary repulsion instead of hard clamp
+    if (n.x < pad) n.vx += (pad - n.x) * 0.05;
+    if (n.x > W - pad) n.vx -= (n.x - (W - pad)) * 0.05;
+    if (n.y < pad) n.vy += (pad - n.y) * 0.05;
+    if (n.y > H - pad) n.vy -= (n.y - (H - pad)) * 0.05;
+  });
+
+  // Node-node repulsion
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i+1; j < nodes.length; j++) {
+      let dx = nodes[j].x - nodes[i].x, dy = nodes[j].y - nodes[i].y;
+      let d2 = dx*dx + dy*dy || 1;
+      const f = 500 / d2;
+      nodes[i].vx -= dx*f; nodes[i].vy -= dy*f;
+      nodes[j].vx += dx*f; nodes[j].vy += dy*f;
+    }
+  }
+
+  // Edge spring attraction
+  edgeObjs.forEach(e => {
+    const dx = e.target.x - e.source.x, dy = e.target.y - e.source.y;
+    const d = Math.sqrt(dx*dx + dy*dy) || 1;
+    const f = (d - 65) * 0.002;
+    e.source.vx += dx/d*f; e.source.vy += dy/d*f;
+    e.target.vx -= dx/d*f; e.target.vy -= dy/d*f;
+  });
+
+  // Apply with damping — no hard clamp
+  nodes.forEach(n => {
+    n.vx *= 0.8; n.vy *= 0.8;
+    n.x += n.vx * 0.12;
+    n.y += n.vy * 0.12;
+  });
+}
+
+for (let i = 0; i < 350; i++) simulate();
+
+// ============================================================
+// STEP DOTS
+// ============================================================
+
+const dotsEl = document.getElementById('step-dots');
+events.forEach((_, i) => {
+  const d = document.createElement('div');
+  d.className = 'step-dot';
+  d.addEventListener('click', () => goToStep(i));
+  dotsEl.appendChild(d);
+});
+const dots = dotsEl.querySelectorAll('.step-dot');
+
+// ============================================================
+// STATE
+// ============================================================
+
+let currentStep = -1;
+let playing = false;
+let timer = null;
+let speed = 1;
+let t = 0;
+
+function resetAll() {
+  graphData.nodes.forEach(n => { n.lit = 0; n.glowPulse = 0; n.activeColor = null; n.weightText = ''; });
+  edgeObjs.forEach(e => { e.lit = 0; e.pulse = 0; });
+  dots.forEach(d => { d.className = 'step-dot'; });
+}
+
+function applyEvent(idx) {
+  const ev = events[idx];
+  // Clear active glow (but keep lit state)
+  graphData.nodes.forEach(n => { n.glowPulse = 0; n.activeColor = null; });
+  edgeObjs.forEach(e => { e.pulse = 0; });
+
+  // Light up new nodes (cumulative)
+  ev.light.forEach(id => {
+    const n = nodeMap[id];
+    if (n) { n.lit = Math.min(1, n.lit + 0.6); n.activeColor = ev.color; }
+  });
+
+  // Active glow
+  ev.glow.forEach(id => {
+    const n = nodeMap[id];
+    if (n) { n.glowPulse = 1; n.activeColor = ev.color; n.lit = 1; }
+  });
+
+  // Edges
+  ev.edges.forEach(([s,t]) => {
+    const e = edgeObjs.find(e =>
+      (e.source.id===s && e.target.id===t) || (e.source.id===t && e.target.id===s));
+    if (e) { e.lit = 1; e.pulse = 1; }
+  });
+
+  // Weight text
+  if (ev.weight) {
+    const n = nodeMap[ev.weight.id];
+    if (n) n.weightText = ev.weight.val;
+  }
+
+  // UI
+  document.querySelector('#status-pill .phase').textContent = ev.phase;
+  document.querySelector('#status-pill .action').textContent = ev.text;
+  const pillColor = ev.color || '#63b8ff';
+  document.getElementById('status-pill').style.borderColor = pillColor + '40';
+
+  dots.forEach((d,i) => {
+    d.className = 'step-dot' + (i < idx ? ' visited' : '') + (i === idx ? ' current' : '');
+  });
+}
+
+function goToStep(idx) {
+  if (idx < 0 || idx >= events.length) return;
+  resetAll();
+  currentStep = idx;
+  for (let i = 0; i <= idx; i++) {
+    // Apply cumulative lit state from all previous steps
+    const ev = events[i];
+    ev.light.forEach(id => { const n = nodeMap[id]; if(n) n.lit = Math.min(1, n.lit + 0.6); });
+    ev.glow.forEach(id => { const n = nodeMap[id]; if(n) n.lit = 1; });
+    ev.edges.forEach(([s,t]) => {
+      const e = edgeObjs.find(e =>
+        (e.source.id===s && e.target.id===t) || (e.source.id===t && e.target.id===s));
+      if (e) e.lit = 1;
+    });
+    if (ev.weight) { const n = nodeMap[ev.weight.id]; if(n) n.weightText = ev.weight.val; }
+  }
+  applyEvent(idx);
+}
+
+function playNext() {
+  if (!playing) return;
+  currentStep++;
+  if (currentStep >= events.length) { stopPlay(); return; }
+  goToStep(currentStep);
+  const dur = currentStep === 0 ? 1800 : (currentStep >= events.length-1 ? 3500 : 2200);
+  timer = setTimeout(playNext, dur / speed);
+}
+
+function startPlay() {
+  if (currentStep >= events.length - 1) { currentStep = -1; resetAll(); }
+  playing = true;
+  document.getElementById('btn-play').textContent = '⏸';
+  document.getElementById('btn-play').classList.add('active');
+  playNext();
+}
+
+function stopPlay() {
+  playing = false;
+  clearTimeout(timer);
+  document.getElementById('btn-play').textContent = '▶';
+  document.getElementById('btn-play').classList.remove('active');
+}
+
+document.getElementById('btn-play').onclick = () => playing ? stopPlay() : startPlay();
+document.getElementById('btn-reset').onclick = () => { stopPlay(); currentStep = -1; resetAll();
+  document.querySelector('#status-pill .phase').textContent = 'READY';
+  document.querySelector('#status-pill .action').textContent = 'Press play to watch the session unfold across the graph';
+  document.getElementById('status-pill').style.borderColor = 'rgba(255,255,255,0.08)';
+};
+document.getElementById('btn-prev').onclick = () => { stopPlay(); goToStep(Math.max(0, currentStep - 1)); };
+document.getElementById('btn-next').onclick = () => { stopPlay(); goToStep(Math.min(events.length-1, currentStep + 1)); };
+
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'k') { e.preventDefault(); playing ? stopPlay() : startPlay(); }
+  if (e.key === 'ArrowRight') { stopPlay(); goToStep(Math.min(events.length-1, currentStep+1)); }
+  if (e.key === 'ArrowLeft') { stopPlay(); goToStep(Math.max(0, currentStep-1)); }
+  if (e.key === 'r') document.getElementById('btn-reset').click();
+  if (e.key === '1') speed = 0.5;
+  if (e.key === '2') speed = 1;
+  if (e.key === '3') speed = 2;
+  if (e.key === '4') speed = 4;
+  document.getElementById('speed-indicator').textContent = speed + '×';
+});
+
+// Tooltip
+canvas.addEventListener('mousemove', e => {
+  const mx = e.clientX - camX, my = e.clientY - camY;
+  const tt = document.getElementById('node-tooltip');
+  let hit = null;
+  graphData.nodes.forEach(n => {
+    if ((n.x-mx)**2 + (n.y-my)**2 < 300) hit = n;
+  });
+  if (hit) {
+    tt.style.display = 'block';
+    tt.style.left = (mx+14) + 'px';
+    tt.style.top = (my-8) + 'px';
+    tt.querySelector('.tt-name').textContent = `Ch ${hit.ch}: ${hit.label}`;
+    tt.querySelector('.tt-unit').textContent = hit.unit.replace(/^\d+-/,'').replace(/-/g,' ');
+    tt.querySelector('.tt-state').textContent = hit.lit > 0 ? (hit.weightText || '● touched') : '○ untouched';
+    tt.querySelector('.tt-state').style.color = hit.activeColor || '#888';
+  } else { tt.style.display = 'none'; }
+});
+
+// ============================================================
+// RENDER
+// ============================================================
+
+// Camera — smoothly tracks the active cluster center
+let camX = 0, camY = 0;
+let targetCamX = 0, targetCamY = 0;
+
+function updateCamera() {
+  // Find centroid of all glowing + lit nodes (the active trace)
+  const active = graphData.nodes.filter(n => n.glowPulse > 0 || n.lit > 0.3);
+  if (active.length > 0) {
+    let cx = 0, cy = 0;
+    active.forEach(n => { cx += n.x; cy += n.y; });
+    cx /= active.length;
+    cy /= active.length;
+    // Offset needed to center that centroid on screen
+    targetCamX = W/2 - cx;
+    targetCamY = H/2 - cy;
+  } else {
+    targetCamX = 0;
+    targetCamY = 0;
+  }
+  // Smooth lerp
+  camX += (targetCamX - camX) * 0.04;
+  camY += (targetCamY - camY) * 0.04;
+}
+
+function draw() {
+  t += 0.015;
+  ctx.clearRect(0, 0, W, H);
+
+  updateCamera();
+  ctx.save();
+  ctx.translate(camX, camY);
+
+  // Edges — dim constellation lines at rest
+  edgeObjs.forEach(e => {
+    ctx.beginPath();
+    ctx.moveTo(e.source.x, e.source.y);
+    ctx.lineTo(e.target.x, e.target.y);
+
+    if (e.pulse > 0) {
+      const a = 0.3 + 0.3 * Math.sin(t * 4);
+      ctx.strokeStyle = `rgba(167, 139, 250, ${a})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Particle
+      const pt = (t * 0.6) % 1;
+      const px = e.source.x + (e.target.x - e.source.x) * pt;
+      const py = e.source.y + (e.target.y - e.source.y) * pt;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI*2);
+      ctx.fillStyle = '#a78bfa';
+      ctx.fill();
+    } else if (e.lit > 0) {
+      ctx.strokeStyle = `rgba(167, 139, 250, ${0.15 + 0.15 * e.lit})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    } else {
+      // Constellation lines — visible but subtle
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  });
+
+  // Nodes — dim constellation dots at rest, bright when active
+  graphData.nodes.forEach(n => {
+    const baseColor = unitColors[n.unit] || '#666';
+
+    // Active glow ring
+    if (n.glowPulse > 0) {
+      const pulseR = 24 + 7 * Math.sin(t * 3);
+      const grad = ctx.createRadialGradient(n.x, n.y, 4, n.x, n.y, pulseR);
+      const ac = n.activeColor || baseColor;
+      grad.addColorStop(0, ac + '55');
+      grad.addColorStop(0.5, ac + '18');
+      grad.addColorStop(1, ac + '00');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, pulseR, 0, Math.PI*2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Node circle
+    const r = n.glowPulse > 0 ? 8 : (n.lit > 0 ? 6 : 4);
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+
+    if (n.glowPulse > 0) {
+      ctx.fillStyle = n.activeColor || baseColor;
+    } else if (n.lit > 0) {
+      ctx.fillStyle = baseColor;
+      ctx.globalAlpha = 0.4 + 0.5 * n.lit;
+    } else {
+      // Dim constellation dot — tinted by unit color
+      ctx.fillStyle = baseColor;
+      ctx.globalAlpha = 0.15;
+    }
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Subtle unit-colored border on dormant nodes for constellation effect
+    if (n.lit <= 0 && n.glowPulse <= 0) {
+      ctx.strokeStyle = baseColor + '20';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    } else if (n.lit > 0) {
+      ctx.strokeStyle = baseColor + '50';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    // Labels
+    if (n.glowPulse > 0) {
+      ctx.font = 'bold 11px "SF Mono", "Fira Code", monospace';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y - r - 10);
+      if (n.weightText) {
+        ctx.font = '10px "SF Mono", monospace';
+        ctx.fillStyle = n.activeColor || '#ef4444';
+        ctx.fillText(n.weightText, n.x, n.y + r + 16);
+      }
+    } else if (n.lit > 0.4) {
+      ctx.font = '9px "SF Mono", "Fira Code", monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y - r - 6);
+    }
+  });
+
+  ctx.restore(); // end camera transform
+}
+
+function loop() {
+  simulate();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

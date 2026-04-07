@@ -1,0 +1,32 @@
+{
+  "name": "learn-graph",
+  "version": "1.0.0",
+  "description": "Adaptive tutoring system for Claude Code. Converts PDFs to Obsidian StudyVaults and runs MCQ or free-response study sessions with concept tracking and graph-based node weighting.",
+  "author": "garrisonfaridi",
+  "repository": "https://github.com/garrisonfaridi/learn-graph",
+  "based_on": "https://github.com/RoundTable02/tutor-skills (MIT)",
+  "skills": [
+    {
+      "name": "tutor",
+      "path": "skills/tutor",
+      "description": "Unified entry point: vault setup + MCQ quizzing + free-response tutoring.",
+      "trigger": "/tutor"
+    },
+    {
+      "name": "tutor-setup",
+      "path": "skills/tutor-setup",
+      "description": "Standalone vault builder from PDF, text, web sources, or codebases.",
+      "trigger": "/tutor-setup"
+    }
+  ],
+  "requires": {
+    "tools": ["pdftotext"],
+    "tool_install": {
+      "macos": "brew install poppler",
+      "debian": "sudo apt-get install poppler-utils",
+      "fedora": "sudo dnf install poppler-utils",
+      "arch": "sudo pacman -S poppler"
+    }
+  },
+  "claude_code_min_version": "1.0.0"
+}
