@@ -8,6 +8,19 @@ description: >
   Use when: studying, quizzing, reviewing, learning from a PDF, testing
   knowledge, checking mastery, practicing recall, or building a study vault.
 argument-hint: "[optional: pdf-path or source-path]"
+metadata:
+  vellum:
+    activation-hints:
+      - "User wants to study, learn, or review material from a document or vault"
+      - "User says 'quiz me', 'test me', 'let's study', or 'check my knowledge'"
+      - "User mentions a StudyVault, study session, or mastery progress"
+      - "User provides a PDF and wants to learn from it, not just summarize it"
+    avoid-when:
+      - "User wants a simple summary or extraction from a PDF (no assessment)"
+      - "User is asking for general knowledge, not drilling from a specific source"
+      - "User wants to build a vault but not start studying (use tutor-setup instead)"
+    includes:
+      - "tutor-setup"
 ---
 
 # Tutor — Unified Adaptive Learning Skill

@@ -8,6 +8,15 @@ description: >
   Use when: setting up a new study vault, ingesting a PDF, adding a source,
   building from a codebase, or creating study materials from documents.
 argument-hint: "[source-path-or-url]"
+metadata:
+  vellum:
+    activation-hints:
+      - "User wants to create a new StudyVault or study notes from a source"
+      - "User provides a PDF, document, or codebase to build learning materials from"
+      - "User wants to add a new source to an existing vault"
+    avoid-when:
+      - "User already has a vault and wants to study or quiz (use tutor instead)"
+      - "User wants to summarize a document without building structured study materials"
 ---
 
 # Tutor Setup — Knowledge to Obsidian StudyVault
