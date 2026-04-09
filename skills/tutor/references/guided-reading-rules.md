@@ -35,15 +35,20 @@ For each node in the reading path:
 4. Invite questions. Respond using vault content + wiki-linked context.
 5. After covering the node, offer:
    - **"Next"** — continue to next node in the path
-   - **"Quiz me on this"** — transition to FR for this node only, then return
+   - **"Quiz me"** — return to SKILL.md Phase 2 Mode Dispatch (MCQ or FR). Scope: all discussed nodes.
+   - **"Quiz me on this"** — return to SKILL.md Phase 2 Mode Dispatch, scoped to current node only. After assessment, return to GR path.
    - **"Go deeper"** — explore wiki-linked neighbors beyond the reading path
    - **"Jump to [topic]"** — skip ahead in the path
 
 ## GR-6: Readiness Transition
 
+**MANDATORY**: ALL assessment transitions route through SKILL.md Phase 2 Mode Dispatch.
+Load the selected mode's reference doc and run its full pipeline (scoring, claim ledger, W(n)).
+Do NOT improvise questions within GR mode — GR teaches, it does not assess.
+
 When the learner signals readiness (explicit or implicit — see Readiness Detection below),
-suggest transitioning to FR or MC mode. If they transition, switch `{mode}` and begin the
-corresponding workflow with the full vault.
+return to Phase 2 Mode Dispatch: present MCQ and FR options, let the user choose, then load
+the corresponding reference doc and begin that mode's workflow with the full vault.
 
 ## GR-7: Session Persistence
 
