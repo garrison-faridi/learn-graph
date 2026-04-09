@@ -10,6 +10,7 @@ script handles all math and file I/O.
 Usage:
   python weight_calc.py update <weights_file> <node> --coverage 0.7 --depth 0.6 --misconception 0.1
   python weight_calc.py update <weights_file> <node> --coverage 0.8 --depth 0.7 --micro
+  python weight_calc.py discussed <weights_file> <node>          # Guided Reading: update R(n) only
   python weight_calc.py score --coverage 0.7 --depth 0.6 --misconception 0.1
   python weight_calc.py recalc <weights_file>
   python weight_calc.py next <weights_file>
@@ -201,6 +202,39 @@ def cmd_next(args):
         print(f"  {n['name']:<45} {n['W']:>6.3f}  {n['M']:>5.2f}  {stars}")
 
 
+def cmd_discussed(args):
+    """Mark a node as recently discussed without assessment (Guided Reading mode).
+    Updates R(n) to 1.0 but leaves M(n) and P(n) unchanged."""
+    nodes = parse_weights(args.weights_file)
+    node = next((n for n in nodes if n['name'] == args.node), None)
+
+    if not node:
+        print(f"Error: Node '{args.node}' not found in {args.weights_file}", file=sys.stderr)
+        sys.exit(1)
+
+    old = {k: node[k] for k in ('M', 'P', 'R', 'W')}
+
+    # Only update recency — no mastery or performance change
+    node['R'] = 1.0
+    node['W'] = compute_w(node['C'], node['M'], node['P'], node['R'])
+
+    # Decay recency for all OTHER nodes
+    if args.decay:
+        for n in nodes:
+            if n['name'] != args.node and n['R'] > 0:
+                n['R'] = round(max(0, n['R'] - RECENCY_DECAY), 3)
+                n['W'] = compute_w(n['C'], n['M'], n['P'], n['R'])
+
+    write_weights(args.weights_file, nodes)
+
+    print(f"[Discussed] {args.node}")
+    print(f"  R(n):    {old['R']:.3f} → {node['R']:.3f}")
+    print(f"  W(n):    {old['W']:.3f} → {node['W']:.3f}")
+    print(f"  M(n):    {node['M']:.3f} (unchanged)")
+    print(f"  P(n):    {node['P']:.3f} (unchanged)")
+    print(f"  Written: {args.weights_file}")
+
+
 def cmd_show(args):
     """Display current weight table."""
     nodes = parse_weights(args.weights_file)
@@ -256,6 +290,12 @@ def main():
     nx.add_argument('weights_file', help='Path to node-weights.md')
     nx.add_argument('--top', type=int, default=5)
     
+    # discussed
+    di = sub.add_parser('discussed', help='Mark node as discussed (no assessment)')
+    di.add_argument('weights_file', help='Path to node-weights.md')
+    di.add_argument('node', help='Node name (exact match)')
+    di.add_argument('--decay', action='store_true', help='Decay recency for other nodes')
+
     # show
     sh = sub.add_parser('show', help='Display weight table')
     sh.add_argument('weights_file', help='Path to node-weights.md')
@@ -265,6 +305,7 @@ def main():
     
     commands = {
         'update': cmd_update,
+        'discussed': cmd_discussed,
         'score': cmd_score,
         'recalc': cmd_recalc,
         'next': cmd_next,

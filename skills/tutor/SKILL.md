@@ -137,10 +137,11 @@ If the vault has only one source, skip this phase entirely.
 
 ## Phase 2: Ask Session Mode
 
-Ask the user before generating any question:
+Ask the user which learning mode they want:
 
 1. **Multiple Choice** — "4-option MCQ quiz. Fast rounds, tracks accuracy by concept."
 2. **Free Response** — "Write-your-own-answer with multi-agent evaluation and depth scoring."
+3. **Guided Reading** — "Conversational teaching. I'll walk you through the material — tell me when you're ready to be tested."
 
 Store the user's selection as `{mode}`.
 
@@ -367,9 +368,71 @@ and atomic file writes to prevent data loss during session handoffs.
 
 ---
 
+## Guided Reading Workflow (when {mode} = Guided Reading)
+
+**MANDATORY**: Read `skills/tutor/references/guided-reading-rules.md` before starting any
+Guided Reading session.
+
+### GR-3: Orientation
+
+1. Check for `00-Dashboard/reading-guide-{source_id}.md` in the vault.
+   (In single-source vaults, use `reading-guide.md` without suffix.)
+2. If found, present the orientation (domain structure, reference systems, recommended approach).
+3. If not found, auto-generate from graph topology scoped to `{active_source}`
+   (see guided-reading-rules.md) and save.
+4. Ask: "Want the full orientation, or ready to dive in?"
+
+### GR-4: Load Reading Path
+
+1. Check for `00-Dashboard/reading-path-{source_id}.md` in the vault.
+   (In single-source vaults, use `reading-path.md` without suffix.)
+2. **If found**: use the manually curated path (may define phases, interleaving, pacing notes).
+3. **If not found**: auto-generate from wiki-link topology scoped to `{active_source}` —
+   topological sort of dependencies, interleave foundational with applied, group into phases.
+   Save as `00-Dashboard/reading-path-{source_id}.md`.
+4. Present the path overview. User can accept, modify, or skip ahead.
+
+### GR-5: Teaching Loop
+
+For each node in the reading path:
+
+1. Read the concept note and its wiki-linked neighbors.
+2. Check `00-Dashboard/false-friends-{source_id}.md` (or `false-friends.md` for single-source) —
+   if the current node contains any false friends,
+   alert BEFORE teaching:
+   > ⚠️ **False Friend: "{term}"** — {why the everyday meaning is wrong} → {domain meaning}
+3. Teach conversationally using vault content as ground truth. Follow **epistemic rules**:
+   - **`[A]` Attested**: from the primary source (cite page/section)
+   - **`[S]` Scholarship**: from commentary or secondary sources (with attribution)
+   - **`[I]` Inference**: agent's own synthesis (label clearly)
+4. Invite questions. Respond using vault content + wiki-linked context.
+5. After covering the node, offer:
+   - **"Next"** — continue to next node in the path
+   - **"Quiz me on this"** — transition to FR for this node only (FR-5 through FR-8), then return
+   - **"Go deeper"** — explore wiki-linked neighbors beyond the reading path
+   - **"Jump to [topic]"** — skip ahead in the path
+
+### GR-6: Readiness Transition
+
+When the learner signals readiness (explicit: "quiz me" / "test me"; implicit: making claims
+unprompted; or 60%+ of path nodes discussed), suggest transitioning to FR or MC mode.
+If they transition, switch `{mode}` and begin the corresponding workflow with the full vault.
+
+### GR-7: Session Persistence
+
+1. Mark discussed nodes in `fr-graph/node-weights.md` — update R(n) only, no mastery change:
+   ```bash
+   python3 skills/tutor/scripts/weight_calc.py discussed <weights_file> <node> --decay
+   ```
+2. Append to `fr-graph/reading-log.md`: nodes covered, questions asked, false friends flagged,
+   where the learner paused or asked for re-explanation, and pickup point for next session.
+
+---
+
 ## Important Reminders
 
 - ALWAYS read reference rules before creating questions (quiz-rules.md or free-response-rules.md)
+- ALWAYS read guided-reading-rules.md before any Guided Reading session
 - NEVER include hints in MCQ options
 - NEVER give away the answer in FR feedback — Socratic probing only
 - NEVER skip the multi-perspective evaluation in FR mode
@@ -377,6 +440,12 @@ and atomic file writes to prevent data loss during session handoffs.
 - After every session: ALWAYS update tracking files
 - Communicate in user's detected language for all output
 - StudyVault data stays on disk, separate from the assistant's operational memory graph
+- **Epistemic discipline**: In ALL modes, distinguish attested `[A]` claims (primary source),
+  scholarship `[S]` (secondary/commentary), and inference `[I]` (agent synthesis). Never
+  present inference as if it were attested.
+- **False friends**: Check `00-Dashboard/false-friends-{source_id}.md` (or `false-friends.md`
+  for single-source vaults) before teaching or quizzing any node. Flag domain terms that
+  look like ordinary words but carry specialized meaning.
 
 ### Scope Contract System (FR Mode)
 

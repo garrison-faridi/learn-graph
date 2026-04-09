@@ -181,6 +181,36 @@ Per templates.md. YAML frontmatter: `source_pdf`, `part`, `keywords`.
 
 Verify against quality-checklist.md. Fix until all checks pass.
 
+### Phase D10: Reading Guide & Path
+
+1. **Reading Guide** — Generate `00-Dashboard/reading-guide.md`:
+   - Domain scope, structure overview, reference/citation system
+   - Genre conventions (how to read this type of source)
+   - Recommended non-linear reading approach
+2. **Reading Path** — Generate `00-Dashboard/reading-path.md`:
+   - Topological sort of wiki-link dependencies
+   - Interleave foundational nodes (high centrality) with applied neighbors
+   - Group into teaching phases (3-5 nodes each) with goals and pacing notes
+   - Save in the manual format so the user can edit later
+
+### Phase D11: False Friends
+
+Generate `00-Dashboard/false-friends.md`:
+1. Scan concept notes for terms that appear in both general vocabulary and the domain glossary
+2. Flag terms where the source explicitly redefines or qualifies meaning
+3. For each false friend: everyday meaning, domain meaning, why it matters, linked nodes
+4. Format as a lookup table (see `tutor/references/guided-reading-rules.md` for template)
+
+### Phase D12: Epistemic Tagging
+
+During D6 (Concept Notes), apply epistemic provenance tags to key claims:
+- **`[A]`** for claims directly from the primary source (with page/section citation)
+- **`[S]`** for claims from commentary or secondary sources (with attribution)
+- **`[I]`** for synthesized connections or interpretations (clearly labeled)
+
+This is especially important for sources with commentary traditions (philosophical texts,
+religious texts, legal documents) where the line between source and interpretation is critical.
+
 ---
 
 ## Codebase Mode

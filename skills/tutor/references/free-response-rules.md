@@ -49,15 +49,28 @@ claims being tested. This contract governs how the evaluator grades the answer.
 ```
 SCOPE_CONTRACT:
   scope_claims:
-    - "DNA is transcribed by RNA polymerase (not DNA polymerase)"
-    - "Codons are triplets of nucleotides that specify amino acids"
-    - "The genetic code is degenerate: multiple codons map to one amino acid"
+    - "[A] DNA is transcribed by RNA polymerase (not DNA polymerase) [p.247]"
+    - "[A] Codons are triplets of nucleotides that specify amino acids [p.250]"
+    - "[S] The genetic code is nearly universal with minor exceptions (Koonin 2017)"
   vault_gaps:
-    - "5' cap and poly-A tail processing in eukaryotes"
-    - "tRNA anticodon-codon base pairing at ribosome A/P/E sites"
-    - "Start codon AUG / stop codons UAA, UAG, UGA"
-    - "Wobble position concentrated at 3rd nucleotide"
+    - "[A] 5' cap and poly-A tail processing in eukaryotes [p.263]"
+    - "[A] tRNA anticodon-codon base pairing at ribosome A/P/E sites [p.258]"
+    - "[I] Degeneracy may buffer against point mutations (inference from wobble)"
 ```
+
+### Epistemic provenance tags
+
+Every scope claim and vault gap SHOULD carry an epistemic tag when the vault supports it:
+
+- **`[A]` Attested** — directly from the primary source, with citation. Grade strictly.
+- **`[S]` Scholarship** — from commentary or secondary sources, with attribution.
+  Accept any credible interpretation from the student.
+- **`[I]` Inference** — agent synthesis or cross-concept connection. Do NOT grade the
+  student on inferences — they are the agent's interpretations, not source truth.
+
+If the vault's concept notes don't have epistemic tags, default all claims to `[A]` (assume
+primary source) and note this in the evaluation. Epistemic tagging is strongest for
+philosophical, historical, and interpretive texts where source vs. commentary matters most.
 
 ### Specificity-grading alignment rule:
 

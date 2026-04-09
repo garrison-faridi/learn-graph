@@ -5,8 +5,8 @@ An adaptive learning skill for AI agents. Feed it **any PDF** — a textbook, a 
 ```
 /tutor my-document.pdf
   → extracts and structures the content into a StudyVault
-  → asks: Multiple Choice or Free Response?
-  → quizzes you, grades you, tracks every concept and gap — session after session
+  → asks: Multiple Choice, Free Response, or Guided Reading?
+  → teaches, quizzes, grades — tracks every concept, gap, and false friend across sessions
 ```
 
 ---
@@ -44,13 +44,15 @@ The `/tutor` and `/tutor-setup` command syntax is a convention — adapt the ent
 
 ## What It Does
 
-Two study modes from a single command:
+Three learning modes from a single command:
 
 **Multiple Choice (MCQ)** — 4-question rounds with adaptive difficulty. Tracks correct/wrong per concept. Automatically drills your weakest areas. Proficiency dashboard updates after every round.
 
 **Free Response (FR)** — Open-ended questions evaluated by three parallel AI agents: one for content coverage, one for mechanistic depth, and one for misconceptions. A graph-based node weighting system decides what to ask next based on concept centrality and your current mastery level.
 
-Both modes share the same StudyVault format and dashboard, so MCQ accuracy feeds directly into FR question targeting.
+**Guided Reading** — Conversational teaching for when you don't know the material yet. The agent walks you through concepts in a structured reading path, flags false friends, follows epistemic rules, and transitions to assessment when you're ready. No quizzing until you say so.
+
+All three modes share the same StudyVault format and dashboard. MCQ accuracy, FR depth scores, and Guided Reading coverage all feed into the same W(n) priority graph.
 
 ### Scope Contract System (FR Mode)
 
@@ -88,6 +90,36 @@ The concept note's YAML frontmatter includes a `tracker:` field pointing to the 
 **Why separate files?** Appending learner history (including wrong answers) to the concept note risks context contamination — weaker models could mistake student misconceptions for facts, especially when error history grows long. Clean separation: content is ground truth, tracker is learner state.
 
 This makes the vault fully self-contained and agent-agnostic. Any agent that can read markdown can reconstruct your exact learner state — no vector database, no memory system, no framework dependency. Just files.
+
+### Guided Reading Mode
+
+For material you don't already know, Guided Reading teaches before testing:
+
+1. **Orientation** — Auto-generated reading guide: domain scope, structure, reference system, genre conventions, and a recommended non-linear approach. Saved per-source as `reading-guide-{source_id}.md` so multi-source vaults each get their own.
+
+2. **Reading Path** — A phased teaching sequence derived from the vault's wiki-link graph. Topological sort of dependencies, interleaved with applied neighbors so you see *why* each foundation matters. Auto-generated from graph topology by default; manually curated `reading-path-{source_id}.md` overrides are supported for deep-reading use cases.
+
+3. **Teaching Loop** — The agent walks through each node conversationally: explains with epistemic precision, flags false friends before you can misinterpret them, invites questions, and offers four options at each step: *Next*, *Quiz me on this*, *Go deeper*, or *Jump to [topic]*.
+
+4. **Readiness Transition** — When you signal readiness (or 60%+ of the reading path is covered), the system suggests switching to FR or MCQ mode. Discussed-but-untested nodes get priority in the assessment queue.
+
+Guided Reading sessions update recency (`R(n)`) without touching mastery (`M(n)`) — no assessment means no mastery claim. Session progress is logged to `fr-graph/reading-log.md`.
+
+### Epistemic Rules
+
+Every claim in a vault note can carry a provenance tag:
+
+- **`[A]` Attested** — directly from the primary source, with citation. Graded strictly in FR.
+- **`[S]` Scholarship** — from commentary or secondary sources, with attribution. Any credible interpretation accepted.
+- **`[I]` Inference** — the agent's own synthesis. Clearly labeled. NOT graded in FR — the student isn't responsible for the agent's interpretations.
+
+This matters most for philosophical, historical, and interpretive texts where the line between source and commentary is critical. For technical/scientific sources, most claims default to `[A]`.
+
+### False Friends
+
+A **false friends file** (`00-Dashboard/false-friends-{source_id}.md`) lists domain terms that look like ordinary English but carry specialized meaning. During Guided Reading, the agent alerts *before* teaching a node with false friends. During FR evaluation, misuse of a false friend term gets flagged by the Misconception Detector (Evaluator 3). During MCQ, false friend distractors use the everyday meaning as wrong answers.
+
+Format: lookup table with columns for term, everyday meaning, domain meaning, why it matters, and linked nodes.
 
 ### Multi-Source Vaults — Incremental Ingestion
 
@@ -177,9 +209,9 @@ Supports both **Document Mode** (PDFs, text, web content) and **Codebase Mode** 
     |              |
     v              v
   Phase 2: Choose mode
-              |           |
-        Multiple        Free
-         Choice        Response
+          |           |           |
+    Multiple        Free        Guided
+     Choice        Response     Reading
               |           |
               v           v
        Build 4 MCQ    Load graph weights
