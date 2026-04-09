@@ -20,7 +20,8 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
 
 # === Constants ===
 MASTERY_ALPHA = 0.3           # EMA learning rate for mastery updates
@@ -32,6 +33,20 @@ W_C = 0.25  # Centrality weight
 W_M = 0.35  # Mastery gap weight (applied as 1-M)
 W_P = 0.20  # Performance weight
 W_R = 0.20  # Recency weight
+
+# XP and leveling
+XP_FR = 10
+XP_MICRO = 5
+XP_DISCUSSED = 2
+XP_IMPROVEMENT_MULTIPLIER = 20  # bonus XP per unit of W(n) improvement
+
+LEVELS = [
+    (0, "Novice"),
+    (100, "Student"),
+    (500, "Scholar"),
+    (2000, "Master"),
+    (5000, "Grandmaster"),
+]
 
 
 # === Core Math ===
@@ -55,6 +70,82 @@ def priority_stars(centrality):
         return "★★"
     else:
         return "★"
+
+
+# === Gamification ===
+
+def get_level(xp):
+    """Return (level_name, next_threshold) for given XP."""
+    name = "Novice"
+    for threshold, n in LEVELS:
+        if xp >= threshold:
+            name = n
+    next_xp = None
+    for threshold, n in LEVELS:
+        if xp < threshold:
+            next_xp = threshold
+            break
+    return name, next_xp
+
+
+def log_event(weights_file, node, mode, score, old, new_vals):
+    """Append event to weight-history.jsonl in the same directory as weights file."""
+    log_path = Path(weights_file).parent / 'weight-history.jsonl'
+    event = {
+        "ts": datetime.now().isoformat(timespec='seconds'),
+        "node": node,
+        "mode": mode,
+        "score": round(score, 3) if score is not None else None,
+        "W": [round(old['W'], 3), round(new_vals['W'], 3)],
+        "M": [round(old['M'], 3), round(new_vals['M'], 3)],
+        "P": [round(old['P'], 3), round(new_vals['P'], 3)],
+        "R": [round(old['R'], 3), round(new_vals['R'], 3)],
+    }
+    with open(log_path, 'a') as f:
+        f.write(json.dumps(event) + '\n')
+
+
+def update_learner_stats(weights_file, mode, score=None, old_w=None, new_w=None):
+    """Update XP, streak, session count. Returns (xp_gain, total_xp, level, streak)."""
+    stats_path = Path(weights_file).parent / 'learner-stats.json'
+
+    if stats_path.exists():
+        stats = json.loads(stats_path.read_text())
+    else:
+        stats = {"xp": 0, "streak_current": 0, "streak_best": 0,
+                 "last_session_date": None, "total_sessions": 0}
+
+    # XP award by mode
+    xp_gain = {"FR": XP_FR, "micro": XP_MICRO, "discussed": XP_DISCUSSED}.get(mode, 0)
+
+    # Improvement bonus
+    if old_w is not None and new_w is not None and new_w > old_w:
+        xp_gain += int((new_w - old_w) * XP_IMPROVEMENT_MULTIPLIER)
+
+    stats["xp"] += xp_gain
+    stats["total_sessions"] += 1
+
+    # Streak tracking
+    today = datetime.now().date()
+    if stats["last_session_date"]:
+        last = datetime.strptime(stats["last_session_date"], '%Y-%m-%d').date()
+        diff = (today - last).days
+        if diff == 0:
+            pass  # same day, no streak change
+        elif diff == 1:
+            stats["streak_current"] += 1
+        else:
+            stats["streak_current"] = 1
+    else:
+        stats["streak_current"] = 1
+
+    stats["streak_best"] = max(stats["streak_best"], stats["streak_current"])
+    stats["last_session_date"] = today.isoformat()
+
+    stats_path.write_text(json.dumps(stats, indent=2) + '\n')
+
+    level_name, _ = get_level(stats["xp"])
+    return xp_gain, stats["xp"], level_name, stats["streak_current"]
 
 
 # === File I/O ===
@@ -152,6 +243,12 @@ def cmd_update(args):
     # Write
     write_weights(args.weights_file, nodes)
     
+    # Log history + XP
+    mode = "micro" if args.micro else "FR"
+    log_event(args.weights_file, args.node, mode, score, old, node)
+    xp_gain, total_xp, level, streak = update_learner_stats(
+        args.weights_file, mode, score, old['W'], node['W'])
+    
     # Report
     print(f"[{label}] {args.node}")
     print(f"  Evaluator: cov={args.coverage:.2f} dep={args.depth:.2f} mis={args.misconception:.2f}")
@@ -161,6 +258,7 @@ def cmd_update(args):
     print(f"  P(n):      {old['P']:.3f} → {node['P']:.3f}")
     print(f"  R(n):      {old['R']:.3f} → {node['R']:.3f}")
     print(f"  W(n):      {old['W']:.3f} → {node['W']:.3f}")
+    print(f"  XP:        +{xp_gain} ({total_xp} total) | {level} | 🔥 {streak}-day streak")
     print(f"  Written:   {args.weights_file}")
 
 
@@ -227,11 +325,17 @@ def cmd_discussed(args):
 
     write_weights(args.weights_file, nodes)
 
+    # Log history + XP
+    log_event(args.weights_file, args.node, "discussed", None, old, node)
+    xp_gain, total_xp, level, streak = update_learner_stats(
+        args.weights_file, "discussed", None, old['W'], node['W'])
+
     print(f"[Discussed] {args.node}")
     print(f"  R(n):    {old['R']:.3f} → {node['R']:.3f}")
     print(f"  W(n):    {old['W']:.3f} → {node['W']:.3f}")
     print(f"  M(n):    {node['M']:.3f} (unchanged)")
     print(f"  P(n):    {node['P']:.3f} (unchanged)")
+    print(f"  XP:      +{xp_gain} ({total_xp} total) | {level} | 🔥 {streak}-day streak")
     print(f"  Written: {args.weights_file}")
 
 
