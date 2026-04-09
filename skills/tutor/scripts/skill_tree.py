@@ -255,7 +255,7 @@ def generate_html(nodes, edges, domains, history, stats, bosses, dstats):
 <title>Skill Tree — Learn Graph</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/vis-network.min.js"></script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#0a0a1a;color:#e0e0e0;font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh}}
