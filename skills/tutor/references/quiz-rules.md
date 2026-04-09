@@ -1,4 +1,65 @@
-# Quiz Design Rules
+# MCQ Mode — Session Flow + Quiz Design Rules
+
+This file contains the complete MCQ session workflow (MCQ-3 through MCQ-6) and all quiz
+design rules. Read entirely before any MCQ session.
+
+---
+
+## MCQ-3: Build Session Options
+
+Read the dashboard proficiency table. Build context-aware options:
+
+1. If unmeasured areas (⬜) exist → include "Diagnostic" option targeting those areas
+2. If weak areas (🟥/🟨) exist → include "Drill weak areas" option naming the weakest area(s)
+3. Always include "Choose a section" option so the user can pick any area
+4. If all areas are 🟩/🟦 → include "Hard-mode review" option
+
+The user MUST select before proceeding.
+
+## MCQ-4: Build Questions
+
+1. Read markdown files in the target section(s).
+2. If drilling a weak area: read `concepts/{area}.md` → find 🔴 unresolved concepts.
+   Rephrase those concepts in new contexts — never repeat the exact same question.
+3. Craft exactly 4 questions following the design rules below. Zero hints allowed.
+
+## MCQ-5: Present Quiz
+
+Present 4 questions with 4 options each:
+- Neutral descriptions, no hints, no "(Recommended)" markers
+- Randomize correct answer position every round
+
+## MCQ-6: Grade, Explain, Update Files
+
+1. Show results table (question / correct answer / user answer / result emoji).
+2. Explain wrong answers concisely.
+3. Update `concepts/{area}.md` — add/update concept rows + error notes.
+4. Update dashboard — recalculate per-area stats.
+   Badges: 🟥 0-39% · 🟨 40-69% · 🟩 70-89% · 🟦 90-100% · ⬜ no data
+
+### MCQ Concept File Format
+
+```markdown
+# {Area Name} — Concept Tracker
+
+| Concept | Attempts | Correct | Last Tested | Status |
+|---------|----------|---------|-------------|--------|
+
+### Error Notes
+```
+
+### Dashboard Proficiency Table
+
+```markdown
+## Proficiency by Area
+
+| Area | Correct | Wrong | Rate | Level | Details |
+|------|---------|-------|------|-------|---------|
+```
+
+---
+
+## Quiz Design Rules
 
 ## Zero-Hint Policy (CRITICAL)
 

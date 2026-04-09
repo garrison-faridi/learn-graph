@@ -1,6 +1,63 @@
-# Guided Reading Rules
+# GR Mode — Session Flow + Teaching Rules
 
-These rules govern every Guided Reading session. Read this file before starting any GR session.
+This file contains the complete Guided Reading session workflow (GR-3 through GR-7) and all
+teaching, epistemic, and false friend rules. Read entirely before any GR session.
+
+---
+
+## GR-3: Orientation
+
+1. Check for `00-Dashboard/reading-guide-{source_id}.md` in the vault.
+   (In single-source vaults, use `reading-guide.md` without suffix.)
+2. If found, present the orientation (domain structure, reference systems, recommended approach).
+3. If not found, auto-generate from graph topology scoped to `{active_source}`
+   (see Orientation section below) and save.
+4. Ask: "Want the full orientation, or ready to dive in?"
+
+## GR-4: Load Reading Path
+
+1. Check for `00-Dashboard/reading-path-{source_id}.md` in the vault.
+   (In single-source vaults, use `reading-path.md` without suffix.)
+2. **If found**: use the manually curated path.
+3. **If not found**: auto-generate from wiki-link topology scoped to `{active_source}` —
+   topological sort, interleave foundational with applied, group into phases.
+   Save as `00-Dashboard/reading-path-{source_id}.md`.
+4. Present the path overview. User can accept, modify, or skip ahead.
+
+## GR-5: Teaching Loop
+
+For each node in the reading path:
+
+1. Read the concept note and its wiki-linked neighbors.
+2. Check false friends file — if the current node contains any, alert BEFORE teaching:
+   > ⚠️ **False Friend: "{term}"** — {why the everyday meaning is wrong} → {domain meaning}
+3. Teach conversationally using vault content as ground truth. Follow epistemic rules below.
+4. Invite questions. Respond using vault content + wiki-linked context.
+5. After covering the node, offer:
+   - **"Next"** — continue to next node in the path
+   - **"Quiz me on this"** — transition to FR for this node only, then return
+   - **"Go deeper"** — explore wiki-linked neighbors beyond the reading path
+   - **"Jump to [topic]"** — skip ahead in the path
+
+## GR-6: Readiness Transition
+
+When the learner signals readiness (explicit or implicit — see Readiness Detection below),
+suggest transitioning to FR or MC mode. If they transition, switch `{mode}` and begin the
+corresponding workflow with the full vault.
+
+## GR-7: Session Persistence
+
+1. Mark discussed nodes — update R(n) only, no mastery change:
+   ```bash
+   python3 skills/tutor/scripts/weight_calc.py discussed <weights_file> <node> --decay
+   ```
+2. Append to `fr-graph/reading-log.md` (see Session Logging below).
+
+---
+
+## Teaching Rules
+
+These rules govern every Guided Reading session.
 
 ---
 

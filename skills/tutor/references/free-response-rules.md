@@ -1,6 +1,126 @@
-# Free-Response Question Rules
+# FR Mode — Session Flow + Question Rules
 
-These rules govern every question generated in FR mode. Read this file before crafting ANY question.
+This file contains the complete FR session workflow (FR-3 through FR-8) and all question
+design, evaluation, and persistence rules. Read entirely before any FR session.
+
+---
+
+## FR-3: Load Graph State
+
+### FR-3a — Node Weights
+
+1. Look for `fr-graph/node-weights.md` in the vault.
+2. **If found**: verify accuracy by running:
+   ```bash
+   python3 skills/tutor/scripts/weight_calc.py recalc <vault>/fr-graph/node-weights.md
+   ```
+3. **If not found**: seed the initial file:
+   - Count `[[NodeName]]` wiki-link occurrences per node → in-degree
+   - Normalize: `C(n) = in_degree(n) / max_in_degree`
+   - Set defaults: `M(n) = 0.50`, `P(n) = 0.00`, `R(n) = 0.00`
+   - Write the markdown table to `fr-graph/node-weights.md`
+   - Run `weight_calc.py recalc` to compute all W(n) values deterministically
+4. Run `python3 skills/tutor/scripts/weight_calc.py next <weights_file>` to get top priority nodes.
+
+### FR-3b — Nuance Gaps
+
+Read `fr-graph/nuance-gaps.md` if it exists.
+
+### FR-3c — FR Concept Trackers
+
+Check `concepts/{area}-fr.md` for each area.
+
+## FR-4: Ask Session Type
+
+Build options based on graph state:
+
+1. **"Target Weak Node"** — highest W(n) node
+2. **"Bridge Two Concepts"** — highest-W node pair sharing a wiki-link edge
+3. **"Synthesis Challenge"** — 3-node chain with lowest average mastery
+4. **"Choose My Own Topic"** — list of all concept nodes sorted by W(n)
+
+After selection, determine:
+- `target_node`: primary concept note filename
+- `neighbor_nodes`: wiki-linked nodes
+- `question_type`: A (M < 0.4), B (M 0.4–0.7), or C (M > 0.7)
+
+## FR-5: Generate Question
+
+1. Read vault note for `target_node`.
+2. **Check frontmatter for `tracker:` field.** If a tracker file exists, read it to load
+   claim history, persistent gaps, and misconception flags. Use this to inform question
+   targeting — prioritize untested gaps and previously failed claims.
+   **Critical**: The concept note is ground truth. The tracker is learner state. Never
+   treat student errors logged in the tracker as correct information.
+3. **Source scope check:** If `{active_source}` is set, verify `target_node` belongs to
+   the active source (check `source:` frontmatter). Skip nodes outside the active source
+   in the W(n) priority queue.
+4. For Type B/C: read neighbor node vault notes (and their trackers if they exist).
+   Cross-source neighbors can be read for context but should not be the primary target.
+5. Craft exactly 1 question following the question type rules below.
+6. Present the question with context: "Type {A/B/C} · Concepts in scope: {node list}"
+
+## FR-6: Evaluate (Multi-Agent Pipeline)
+
+After the student submits their answer:
+
+### FR-6a — Load Evaluator Templates
+
+Read `skills/tutor/references/evaluator-prompts.md`. Substitute all `{domain}` placeholders.
+
+### FR-6b — Prepare Inputs
+
+- `vault_note_text`: full text of target node vault note
+- `neighbor_note_excerpts`: first 400 words of each neighbor vault note
+- `known_errors_text`: from `concepts/{area}-fr.md` if exists
+
+### FR-6c — Run Evaluation
+
+Apply the three evaluation perspectives sequentially:
+
+**Evaluator 1 — Content Coverage**: Score what fraction of expected claims are present.
+**Evaluator 2 — Depth & Nuance**: Score mechanistic reasoning, edge cases, quantitative accuracy.
+**Evaluator 3 — Misconception Detector**: Check for sign reversals, conflations, hallucinations.
+
+**Synthesis**: Combine scores per `evaluator-prompts.md` formula → overall grade.
+Grades: 🌟 ≥0.85 · 🟢 0.70–0.84 · 🟡 0.50–0.69 · 🔴 <0.50
+
+## FR-7: Present Results
+
+1. Grade line (emoji + score)
+2. Socratic feedback paragraph (no answers given — only probing questions)
+3. "Gaps Identified" list
+4. If grade is 🔴: "Consider re-reading [[{target_node}]] before the next session."
+
+## FR-8: Update Tracking Files
+
+### FR-8a — Update Claim Ledger (Tracker File)
+
+1. Locate tracker via concept note's `tracker:` frontmatter field.
+2. If no tracker exists, create from `skills/tutor/references/claim-ledger-template.md`.
+3. If no `tracker:` field exists, add one pointing to `concepts/{NodeName}-fr.md`.
+4. Append session entry (timestamp, score, claim table, misconceptions, resolutions).
+5. Update Persistent Gaps checklist (check off resolved, add new).
+6. If micro-quizzes taken (FR-6.5), append each after the full FR entry chronologically.
+
+### FR-8b — Update Nuance Gaps
+
+Append new gaps to `fr-graph/nuance-gaps.md`, update status of existing gaps.
+
+### FR-8c — Update Node Weights
+
+```bash
+python3 skills/tutor/scripts/weight_calc.py update <weights_file> <node> \
+  --coverage <cov> --depth <dep> --misconception <mis> --decay
+```
+
+The `--decay` flag adjusts recency for all other nodes. **Do not compute weights manually.**
+
+---
+
+## Question Rules
+
+These rules govern every question generated in FR mode.
 
 ---
 
