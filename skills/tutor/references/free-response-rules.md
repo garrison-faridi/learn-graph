@@ -164,7 +164,18 @@ claims being tested. This contract governs how the evaluator grades the answer.
 3. **Pass both lists to the evaluator.** The evaluator grades against `scope_claims` only. It logs
    `vault_gaps` separately as "untested depth."
 
-### Scope contract format (internal, not shown to student):
+### Scope Contract Visibility
+
+The scope contract is NEVER displayed in chat. After generating scope claims and vault gaps:
+
+1. Write them to a scratch file: `fr-graph/.scope-{node}.md`
+2. Present ONLY the question to the student
+3. After grading, move scope data into the tracker file (FR-8a)
+4. Delete the scratch file
+
+The student sees the question. The evaluator reads the scratch file. The tracker preserves the record.
+
+### Scope contract format (written to scratch file, never to chat):
 
 ```
 SCOPE_CONTRACT:
